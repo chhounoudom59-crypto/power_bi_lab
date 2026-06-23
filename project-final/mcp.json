@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "powerbi": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\ROG Zephyrus G15\\Desktop\\bitest\\project-final\\server.js"
+      ],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    "ollama": {
+      "command": "ollama",
+      "args": ["run", "llama3.1:8b"]
+    }
+  }
+}

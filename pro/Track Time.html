@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Queue Tracking System</title>
+    <style>
+        /* ==========================================================================
+           1. CORE DESIGN THEME & VARIABLES
+           ========================================================================== */
+        :root {
+            --bg-main: #f0f2f5;
+            --panel-bg: #ffffff;
+            --text-dark: #1a2332;
+            --text-muted: #6b7280;
+            
+            /* Action Accent Colors */
+            --color-primary: #2563eb;     /* Arrival Blue */
+            --color-primary-hover: #1d4ed8;
+            --color-success: #10b981;     /* Start/Busy Green */
+            --color-success-hover: #059669;
+            --color-danger: #ef4444;      /* End Service Red */
+            --color-danger-hover: #dc2626;
+            --color-warning: #f59e0b;     /* Export Orange */
+            --color-warning-hover: #d97706;
+            --color-unpaid: #8b5cf6;      /* Left without payment Purple */
+            --color-unpaid-hover: #7c3aed;
+            
+            /* Status Display Colors */
+            --badge-idle-bg: #e5e7eb;
+            --badge-idle-text: #4b5563;
+            --row-serving-bg: #dcfce7;
+            --row-unpaid-bg: #fce7f3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f0f2f5 0%, #e9ecef 100%);
+            color: #333333;
+            padding: 32px 24px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 32px;
+            color: var(--text-dark);
+            font-weight: 700;
+            font-size: 2.2rem;
+            letter-spacing: -0.5px;
+        }
+
+        /* ==========================================================================
+           2. HEADER CLOCK MODULE
+           ========================================================================== */
+        .clock-card {
+            background: linear-gradient(135deg, var(--text-dark) 0%, #2d3748 100%);
+            color: #ffffff;
+            text-align: center;
+            padding: 24px 32px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            box-shadow: 0 10px 30px rgba(26, 35, 50, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .clock-card h2 {
+            font-size: 1.3rem;
+            font-weight: 500;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        #live-clock {
+            font-weight: 800;
+            color: var(--color-primary);
+            font-size: 1.5rem;
+            display: block;
+            margin-top: 8px;
+        }
+
+        /* ==========================================================================
+           3. INTERACTIVE CONTROL PANEL MATRIX
+           ========================================================================== */
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: var(--panel-bg);
+            padding: 28px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            border-top: 5px solid var(--color-primary);
+            transition: all 0.3s ease;
+            border: 1px solid #e5e7eb;
+            position: relative;
+        }
+
+        .card:hover {
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px);
+        }
+
+        .cashier-card {
+            border-top-color: #8b5cf6;
+        }
+
+        /* Active Serving Matrix Highlighting Engine */
+        .card.active-serving {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(16, 185, 129, 0.2);
+            border-top-color: var(--color-success);
+            background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+            border: 1px solid #d1fae5;
+        }
+
+        .card h3 {
+            color: var(--text-dark);
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        .stats {
+            margin-top: 16px;
+            font-size: 1rem;
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+        
+        #wait-count {
+            font-weight: 800;
+            color: var(--color-primary);
+            font-size: 1.8rem;
+        }
+
+        .serving-info {
+            font-size: 0.95rem;
+            margin: 12px 0 20px 0;
+            color: var(--text-muted);
+        }
+
+        .serving-info span {
+            font-weight: 700;
+            color: var(--text-dark);
+            font-family: 'Courier New', monospace;
+        }
+
+        /* ==========================================================================
+           4. STATUS BADGE SUB-SYSTEM
+           ========================================================================== */
+        .status-badge {
+            display: inline-block;
+            padding: 8px 18px;
+            border-radius: 24px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            letter-spacing: 1.2px;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+        }
+
+        .idle { 
+            background: var(--badge-idle-bg); 
+            color: var(--badge-idle-text); 
+        }
+        
+        .busy { 
+            background: var(--color-success); 
+            color: #ffffff; 
+            animation: pulseFade 2s infinite ease-in-out; 
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        @keyframes pulseFade {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        /* ==========================================================================
+           5. ACTION INTERACTIVE BUTTON ELEMENT SYSTEM
+           ========================================================================== */
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn-group.three-buttons {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .btn {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-add { 
+            background: var(--color-primary); 
+            color: #ffffff;
+            width: 100%; 
+        }
+        .btn-add:hover { background: var(--color-primary-hover); }
+
+        .btn-start { 
+            background: var(--color-success); 
+            color: #ffffff; 
+        }
+        .btn-start:hover { background: var(--color-success-hover); }
+
+        .btn-end { 
+            background: var(--color-danger); 
+            color: #ffffff; 
+        }
+        .btn-end:hover { background: var(--color-danger-hover); }
+
+        .btn-left { 
+            background: var(--color-unpaid); 
+            color: #ffffff; 
+            grid-column: 1 / -1;
+        }
+        .btn-left:hover { background: var(--color-unpaid-hover); }
+
+        .btn-export { 
+            background: var(--color-warning); 
+            color: #ffffff; 
+            padding: 10px 20px; 
+            font-size: 0.9rem;
+        }
+        .btn-export:hover { background: var(--color-warning-hover); }
+
+        .btn:disabled {
+            background: #d1d5db !important;
+            color: #9ca3af !important;
+            cursor: not-allowed;
+            opacity: 0.6;
+            transform: none !important;
+        }
+
+        /* ==========================================================================
+           6. UNIFIED IN-LINE PERFORMANCE DATALOG GRID
+           ========================================================================== */
+        .table-section {
+            background: var(--panel-bg);
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e5e7eb;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 16px;
+        }
+
+        .table-header h3 {
+            color: var(--text-dark);
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            text-align: left;
+            min-width: 800px;
+        }
+
+        th, td {
+            padding: 16px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background-color: #f9fafb;
+            color: var(--text-dark);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.8px;
+            position: sticky;
+            top: 0;
+        }
+
+        /* Real-Time Processing In-Place Visual Highlight Row Styles */
+        tr.serving-row {
+            background-color: var(--row-serving-bg) !important;
+            color: #111111;
+        }
+        
+        tr.serving-row td strong {
+            color: var(--color-success-hover);
+        }
+
+        tr.unpaid-row {
+            background-color: var(--row-unpaid-bg) !important;
+            color: #111111;
+        }
+        
+        tr.unpaid-row td strong {
+            color: var(--color-unpaid-hover);
+        }
+
+        tr:hover {
+            background-color: #f9fafb;
+        }
+
+        /* Responsive Breakpoint Adjustment Scaling overrides */
+        @media (max-width: 768px) {
+            body { padding: 16px; }
+            h1 { font-size: 1.8rem; }
+            .table-section { padding: 20px; }
+            .table-header { flex-direction: column; gap: 16px; align-items: flex-start; }
+            .btn-export { width: 100%; }
+            .control-panel { grid-template-columns: 1fr; }
+            .btn-group { grid-template-columns: 1fr; }
+            .btn-group.three-buttons { grid-template-columns: 1fr; }
+            .btn-left { grid-column: 1; }
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            h1 { font-size: 1.5rem; margin-bottom: 20px; }
+            .table-section { padding: 16px; }
+            table { min-width: 100%; }
+            th, td { padding: 12px; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Queue Tracking Dashboard</h1>
+        
+        <!-- Live System Clock Display Module -->
+        <div class="clock-card">
+            <h2>Current Time: <span id="live-clock">00:00:00</span></h2>
+        </div>
+
+        <!-- Dashboard Interaction Card Matrix -->
+        <div class="control-panel">
+            <!-- 1. Customer Generation Card -->
+            <div class="card">
+                <h3>1. Customer Arrival</h3>
+                <button id="btn-add-customer" class="btn btn-add">Add Customer to Queue</button>
+                <p class="stats">Waiting in Line: <span id="wait-count">0</span></p>
+                <button id="btn-customer-left-queue" class="btn btn-left" disabled>Customer Left (Got Bored)</button>
+            </div>
+
+            <!-- 2. Cashier Counter Processing Station 1 -->
+            <div class="card cashier-card" id="card-cashier-1">
+                <h3>Cashier 1</h3>
+                <div class="status-badge idle" id="status-c1">Idle</div>
+                <p class="serving-info">Active Customer: <span id="serving-c1">-</span></p>
+                <div class="btn-group">
+                    <button id="btn-start-c1" class="btn btn-start">Start Service</button>
+                    <button id="btn-end-c1" class="btn btn-end" disabled>End Service</button>
+                </div>
+            </div>
+
+            <!-- 3. Cashier Counter Processing Station 2 -->
+            <div class="card cashier-card" id="card-cashier-2">
+                <h3>Cashier 2</h3>
+                <div class="status-badge idle" id="status-c2">Idle</div>
+                <p class="serving-info">Active Customer: <span id="serving-c2">-</span></p>
+                <div class="btn-group">
+                    <button id="btn-start-c2" class="btn btn-start">Start Service</button>
+                    <button id="btn-end-c2" class="btn btn-end" disabled>End Service</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Row-Persistent Processing Logging Grid -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3>Queue Performance Log</h3>
+                <button id="btn-export" class="btn btn-export">Export CSV</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Customer ID</th>
+                            <th>Arrival Time</th>
+                            <th>Cashier No</th>
+                            <th>Service Start</th>
+                            <th>Service End</th>
+                            <th>Service Time</th>
+                            <th>Waiting Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-table-body">
+                        <!-- Single persistent rows are rendered here instantly upon generation -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+       7. JAVASCRIPT STATE ENGINE & DATA ARCHITECTURE LOGIC
+       ========================================================================== -->
+    <script>
+        // Central Repository State Framework Architecture
+        let masterDatabase = []; // Holds every single customer record tracking structural mutation states
+        let queue = [];          // Array processing queue managing awaiting lines FIFO
+        let customerCounter = 1; // Primary structural tracking row counter key generation anchor
+
+        // Internal Working Active Tracking Configuration Scopes
+        let cashier1 = { activeCustomer: null, cardId: 'card-cashier-1', statusId: 'status-c1', servingId: 'serving-c1', startBtn: 'btn-start-c1', endBtn: 'btn-end-c1' };
+        let cashier2 = { activeCustomer: null, cardId: 'card-cashier-2', statusId: 'status-c2', servingId: 'serving-c2', startBtn: 'btn-start-c2', endBtn: 'btn-end-c2' };
+
+        // Running Live Digital Ticking Clock Driver Component Engine Setup
+        setInterval(() => {
+            document.getElementById('live-clock').innerText = formatTime(new Date());
+        }, 1000);
+
+        // Core Event Trigger Listener Registries
+        document.getElementById('btn-add-customer').addEventListener('click', addCustomer);
+        document.getElementById('btn-start-c1').addEventListener('click', () => startService(1, cashier1));
+        document.getElementById('btn-start-c2').addEventListener('click', () => startService(2, cashier2));
+        document.getElementById('btn-end-c1').addEventListener('click', () => endService(cashier1));
+        document.getElementById('btn-end-c2').addEventListener('click', () => endService(cashier2));
+        document.getElementById('btn-customer-left-queue').addEventListener('click', customerLeftQueue);
+        document.getElementById('btn-export').addEventListener('click', exportToCSV);
+
+        // Feature 1: Process and Register Customer Entry Arrival (Creates Single Persistent Row)
+        function addCustomer() {
+            const now = new Date();
+            const newCustomer = {
+                id: `CUST-${String(customerCounter).padStart(3, '0')}`,
+                arrivalTime: now,
+                cashierNo: '-',
+                startTime: null,
+                endTime: null,
+                serviceTimeStr: '-',
+                waitingTimeStr: '-',
+                isBeingServed: false,
+                leftWithoutPaying: false,
+                status: null
+            };
+            
+            masterDatabase.push(newCustomer);
+            queue.push(newCustomer);
+            customerCounter++;
+            
+            updateQueueDisplay();
+            renderTable();
+        }
+
+        // Feature 2: Transition Customer State from Waiting Line to Assigned Active Counter Desk Row In-Place
+        function startService(cashierNum, cashierObj) {
+            if (queue.length === 0) {
+                alert("The waiting queue line is empty!");
+                return;
+            }
+            
+            // Dequeue data from the line tracking memory loop array
+            const customer = queue.shift();
+            const now = new Date();
+            
+            // Apply Mutations Directly onto the structural reference in Master Base
+            customer.cashierNo = cashierNum;
+            customer.startTime = now;
+            
+            // Feature 3 Calculations: Tracks wait times exactly from insertion matrix bounds
+            customer.waitingTimeStr = calculateDuration(customer.arrivalTime, now);
+            customer.isBeingServed = true;
+            
+            cashierObj.activeCustomer = customer;
+            
+            updateCashierUI(cashierObj, true);
+            updateQueueDisplay();
+            renderTable();
+        }
+
+        // Feature 2: Complete Transaction Operations and Lock Processing Durations on Existing Persistent Row
+        function endService(cashierObj) {
+            const customer = cashierObj.activeCustomer;
+            if (!customer) return;
+            
+            const now = new Date();
+            customer.endTime = now;
+            
+            // Feature 3 Calculations: Delta handling metrics
+            customer.serviceTimeStr = calculateDuration(customer.startTime, now);
+            customer.isBeingServed = false;
+            
+            cashierObj.activeCustomer = null;
+            
+            updateCashierUI(cashierObj, false);
+            renderTable();
+        }
+
+        // Feature 4: Customer Left Queue (Got Tired of Waiting)
+        function customerLeftQueue() {
+            if (queue.length === 0) return;
+            
+            // Remove last customer from queue (FIFO - remove first one added)
+            const customer = queue.shift();
+            
+            // Mark as left without being served
+            customer.leftWithoutPaying = true;
+            customer.status = 'LEFT QUEUE';
+            
+            updateQueueDisplay();
+            renderTable();
+        }
+
+        // Interface Display Sync Methods
+        function updateQueueDisplay() {
+            document.getElementById('wait-count').innerText = queue.length;
+            // Enable/disable "Got Bored" button based on queue length
+            document.getElementById('btn-customer-left-queue').disabled = queue.length === 0;
+        }
+
+        // Handles highlight class updates and button blocking mechanics dynamically
+        function updateCashierUI(cashierObj, isBusy) {
+            const card = document.getElementById(cashierObj.cardId);
+            const status = document.getElementById(cashierObj.statusId);
+            const serving = document.getElementById(cashierObj.servingId);
+            const startB = document.getElementById(cashierObj.startBtn);
+            const endB = document.getElementById(cashierObj.endBtn);
+            
+            if (isBusy) {
+                card.classList.add('active-serving');
+                status.innerText = "BUSY";
+                status.className = "status-badge busy";
+                serving.innerText = cashierObj.activeCustomer.id;
+                startB.disabled = true;
+                endB.disabled = false;
+            } else {
+                card.classList.remove('active-serving');
+                status.innerText = "IDLE";
+                status.className = "status-badge idle";
+                serving.innerText = "-";
+                startB.disabled = false;
+                endB.disabled = true;
+            }
+        }
+
+        // Continuous State Dynamic Rendering UI Layout Maintenance Engine
+        function renderTable() {
+            const tbody = document.getElementById('log-table-body');
+            tbody.innerHTML = ''; // Reset node container layers cleanly
+            
+            // Loop array data in insertion order keeping rows exactly mapped in chronological sequence matches
+            masterDatabase.forEach(item => {
+                const row = document.createElement('tr');
+                
+                // Active execution highlight configuration
+                if (item.isBeingServed) {
+                    row.className = 'serving-row';
+                } else if (item.leftWithoutPaying) {
+                    row.className = 'unpaid-row';
+                }
+                
+                row.innerHTML = `
+                    <td><strong>${item.id}</strong></td>
+                    <td>${formatTime(item.arrivalTime)}</td>
+                    <td>${item.cashierNo}</td>
+                    <td>${item.startTime ? formatTime(item.startTime) : '-'}</td>
+                    <td>${item.endTime ? formatTime(item.endTime) : '-'}</td>
+                    <td>${item.serviceTimeStr}</td>
+                    <td>${item.status === 'LEFT QUEUE' ? '<strong style="color: #8b5cf6;">LEFT QUEUE</strong>' : item.status === 'NO PAYMENT' ? '<strong style="color: #8b5cf6;">NO PAYMENT</strong>' : item.waitingTimeStr}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // String Time Struct Parsing Tools
+        function formatTime(dateObj) {
+            if (!dateObj) return '-';
+            const hrs = String(dateObj.getHours()).padStart(2, '0');
+            const mins = String(dateObj.getMinutes()).padStart(2, '0');
+            const secs = String(dateObj.getSeconds()).padStart(2, '0');
+            return `${hrs}:${mins}:${secs}`;
+        }
+
+        // Performance Mathematics calculation tracking strings: returns structural format (HH:MM:SS)
+        function calculateDuration(start, end) {
+            const diffMs = end - start;
+            const diffSecs = Math.floor(diffMs / 1000);
+            
+            const hrs = String(Math.floor(diffSecs / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((diffSecs % 3600) / 60)).padStart(2, '0');
+            const secs = String(diffSecs % 60).padStart(2, '0');
+            
+            return `${hrs}:${mins}:${secs}`;
+        }
+
+        // Feature 6: CSV Stream Data Exporter File Generation Driver Subroutine
+        function exportToCSV() {
+            if (masterDatabase.length === 0) {
+                alert("There is no data captured across the execution matrix to run export pipelines yet!");
+                return;
+            }
+            
+            let csvContent = "Customer ID,Arrival Time,Cashier No,Service Start Time,Service End Time,Service Time,Status\n";
+            
+            masterDatabase.forEach(item => {
+                const statusCol = item.status === 'LEFT QUEUE' ? 'LEFT QUEUE (BORED)' : item.status === 'NO PAYMENT' ? 'NO PAYMENT' : item.waitingTimeStr;
+                const row = [
+                    item.id,
+                    formatTime(item.arrivalTime),
+                    item.cashierNo,
+                    formatTime(item.startTime),
+                    formatTime(item.endTime),
+                    item.serviceTimeStr,
+                    statusCol
+                ].join(",");
+                csvContent += row + "\n";
+            });
+            
+            // Trigger background download stream pipeline configurations
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `queue_report_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

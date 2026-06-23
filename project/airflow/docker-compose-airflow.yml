@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres-airflow:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-postgres:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    networks:
+      - airflow-network
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    networks:
+      - airflow-network
+
+  airflow-webserver:
+    image: apache/airflow:2.7.0
+    depends_on:
+      - postgres-airflow
+      - redis
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__WEBSERVER__RBAC: 'True'
+      AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: 'Asia/Phnom_Penh'
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'this_is_a_very_secret_key'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ../:/opt/airflow/etl_project
+    ports:
+      - "8081:8080"
+    command: webserver
+    networks:
+      - airflow-network
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.0
+    depends_on:
+      - postgres-airflow
+      - redis
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ../:/opt/airflow/etl_project
+    command: scheduler
+    networks:
+      - airflow-network
+
+  airflow-worker:
+    image: apache/airflow:2.7.0
+    depends_on:
+      - postgres-airflow
+      - redis
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ../:/opt/airflow/etl_project
+    command: celery worker
+    networks:
+      - airflow-network
+
+networks:
+  airflow-network:
+    driver: bridge
+
+volumes:
+  airflow-postgres:

@@ -1,0 +1,67 @@
+{
+  "dashboard": {
+    "title": "LMS ETL Pipeline Monitor",
+    "tags": ["etl", "lms", "monitoring"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "ETL Runtime (Last 7 Days)",
+        "type": "graph",
+        "targets": [
+          {
+            "sql": "SELECT execution_date, duration_minutes FROM etl_metadata WHERE execution_date > NOW() - INTERVAL '7 days' ORDER BY execution_date",
+            "format": "time_series"
+          }
+        ],
+        "fieldConfig": {
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": 0},
+              {"color": "yellow", "value": 90},
+              {"color": "red", "value": 120}
+            ]
+          }
+        }
+      },
+      {
+        "title": "Data Freshness",
+        "type": "stat",
+        "targets": [
+          {
+            "sql": "SELECT EXTRACT(EPOCH FROM (NOW() - MAX(created_at)))/3600 as hours_old FROM fact_attendance",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": 0},
+              {"color": "yellow", "value": 12},
+              {"color": "red", "value": 24}
+            ]
+          }
+        }
+      },
+      {
+        "title": "Row Count Trends",
+        "type": "graph",
+        "targets": [
+          {
+            "sql": "SELECT DATE(created_at) as time, COUNT(*) as count, 'Attendance' as metric FROM fact_attendance GROUP BY DATE(created_at) UNION ALL SELECT DATE(created_at) as time, COUNT(*) as count, 'Enrollment' as metric FROM fact_enrollment GROUP BY DATE(created_at)",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "title": "Data Quality Status",
+        "type": "table",
+        "targets": [
+          {
+            "sql": "SELECT 'NULL Foreign Keys' as check_name, COUNT(*) as error_count FROM fact_attendance WHERE student_sk IS NULL UNION ALL SELECT 'Invalid GPA' as check_name, COUNT(*) as error_count FROM fact_score WHERE gpa < 0 OR gpa > 4.0 UNION ALL SELECT 'Negative Duration' as check_name, COUNT(*) as error_count FROM fact_attendance WHERE duration_minutes < 0",
+            "format": "table"
+          }
+        ]
+      }
+    ]
+  }
+}

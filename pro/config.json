@@ -1,0 +1,28 @@
+{
+  "source": {
+    "type": "postgresql",
+    "host": "localhost",
+    "port": 5432,
+    "database": "lms-prod",
+    "user": "postgres",
+    "password": "your_postgres_password",
+    "schema": "public"
+  },
+  "target": {
+    "type": "postgresql",
+    "host": "localhost",
+    "port": 5432,
+    "database": "data_warehouse",
+    "user": "postgres",
+    "password": "your_postgres_password",
+    "schema": "public"
+  },
+  "pipeline": {
+    "tables": null,
+    "mode": "replace",
+    "schedule": "daily",
+    "time": "02:00",
+    "log_level": "INFO",
+    "description": "Update the password fields above with your actual PostgreSQL credentials. See .env.example for environment variable setup."
+  }
+}

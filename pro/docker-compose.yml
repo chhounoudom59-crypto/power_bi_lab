@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # Source PostgreSQL Database (LMS Production)
+  postgres_source:
+    image: postgres:15-alpine
+    container_name: etl_source_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_source_password
+      POSTGRES_DB: lms-prod
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_source_data:/var/lib/postgresql/data
+      - ./setup_data_warehouse.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl_network
+
+  # Target PostgreSQL Database (Data Warehouse)
+  postgres_target:
+    image: postgres:15-alpine
+    container_name: etl_target_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_target_password
+      POSTGRES_DB: data_warehouse
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_target_data:/var/lib/postgresql/data
+      - ./setup_data_warehouse.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl_network
+
+  # ETL Pipeline Service
+  etl_pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: etl_pipeline_runner
+    environment:
+      DB_HOST: postgres_source
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres_source_password
+      DB_NAME: lms-prod
+      DW_HOST: postgres_target
+      DW_PORT: 5432
+      DW_USER: postgres
+      DW_PASSWORD: postgres_target_password
+      DW_NAME: data_warehouse
+      LOG_LEVEL: INFO
+    volumes:
+      - ./logs:/app/logs
+      - ./config.json:/app/config.json
+    depends_on:
+      postgres_source:
+        condition: service_healthy
+      postgres_target:
+        condition: service_healthy
+    networks:
+      - etl_network
+    restart: on-failure:3
+    # Uncomment below to run in one-shot mode
+    # command: ["python", "etl_pipeline.py", "config.json"]
+
+  # ETL Scheduler Service (optional - runs continuously)
+  etl_scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: etl_scheduler
+    environment:
+      DB_HOST: postgres_source
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres_source_password
+      DB_NAME: lms-prod
+      DW_HOST: postgres_target
+      DW_PORT: 5432
+      DW_USER: postgres
+      DW_PASSWORD: postgres_target_password
+      DW_NAME: data_warehouse
+      LOG_LEVEL: INFO
+    volumes:
+      - ./logs:/app/logs
+      - ./config.json:/app/config.json
+    depends_on:
+      postgres_source:
+        condition: service_healthy
+      postgres_target:
+        condition: service_healthy
+    networks:
+      - etl_network
+    restart: unless-stopped
+    command: ["python", "scheduler.py", "config.json"]
+    # Uncomment below to disable scheduler service (run pipeline manually)
+    # profiles: ["disabled"]
+
+  # PgAdmin for Database Management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres_source
+      - postgres_target
+    networks:
+      - etl_network
+    # Uncomment below to disable pgadmin
+    # profiles: ["disabled"]
+
+volumes:
+  postgres_source_data:
+    driver: local
+  postgres_target_data:
+    driver: local
+
+networks:
+  etl_network:
+    driver: bridge

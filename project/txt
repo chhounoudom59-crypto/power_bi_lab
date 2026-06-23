@@ -1,0 +1,12 @@
+Host: postgres
+Port: 5432
+Database: app_db
+Username: admin
+Password: admin
+
+
+Host: warehouse_postgres
+Port: 5432
+Database: warehouse
+Username: admin
+Password: admin

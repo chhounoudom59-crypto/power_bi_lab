@@ -1,0 +1,76 @@
+version: '3.9'
+
+services:
+
+  # SOURCE DATABASE
+  postgres:
+    image: postgres:17
+    container_name: postgres_db
+    restart: always
+
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: app_db
+
+    ports:
+      - "5434:5432"
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database.sql:/docker-entrypoint-initdb.d/database.sql
+
+  # DATA WAREHOUSE
+  warehouse_postgres:
+    image: postgres:17
+    container_name: warehouse_db
+    restart: always
+
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: warehouse
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - warehouse_pgdata:/var/lib/postgresql/data
+
+  # PGADMIN
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    restart: always
+
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+
+    ports:
+      - "8080:80"
+
+    depends_on:
+      - postgres
+      - warehouse_postgres
+
+  # GRAFANA
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      - warehouse_postgres
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  warehouse_pgdata:
+  grafana-storage:

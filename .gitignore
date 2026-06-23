@@ -1,0 +1,13 @@
+# Data files
+*.csv
+*.xlsx
+*.zip
+
+# Logs
+*.log
+
+# Airflow
+project/airflow/logs/
+
+# Dataset folder
+module7/Data/

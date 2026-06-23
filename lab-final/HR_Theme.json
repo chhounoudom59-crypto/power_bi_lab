@@ -1,0 +1,70 @@
+{
+  "name": "HR Premium Modern",
+  "dataColors": [
+    "#4F46E5", 
+    "#06B6D4", 
+    "#EC4899", 
+    "#10B981", 
+    "#F59E0B", 
+    "#6B7280", 
+    "#8B5CF6", 
+    "#EF4444"
+  ],
+  "background": "#F9FAFB",
+  "foreground": "#111827",
+  "tableAccent": "#4F46E5",
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#FFFFFF" } },
+            "transparency": 0
+          }
+        ],
+        "border": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#E5E7EB" } },
+            "radius": 8
+          }
+        ],
+        "dropShadow": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#000000" } },
+            "transparency": 95,
+            "position": "Outer",
+            "preset": "BottomRight"
+          }
+        ],
+        "title": [
+          {
+            "show": true,
+            "fontColor": { "solid": { "color": "#111827" } },
+            "fontSize": 12,
+            "fontFamily": "Segoe UI Semibold"
+          }
+        ]
+      }
+    },
+    "card": {
+      "*": {
+        "labels": [
+          {
+            "fontSize": 24,
+            "fontFamily": "Segoe UI Semibold",
+            "color": { "solid": { "color": "#4F46E5" } }
+          }
+        ],
+        "categoryLabels": [
+          {
+            "fontSize": 9,
+            "color": { "solid": { "color": "#6B7280" } }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "source": {
+    "type": "postgresql",
+    "host": "postgres_source",
+    "port": 5432,
+    "database": "lms-prod",
+    "user": "postgres",
+    "password": "postgres_source_password",
+    "schema": "public"
+  },
+  "target": {
+    "type": "postgresql",
+    "host": "postgres_target",
+    "port": 5432,
+    "database": "data_warehouse",
+    "user": "postgres",
+    "password": "postgres_target_password",
+    "schema": "public"
+  },
+  "pipeline": {
+    "tables": null,
+    "mode": "replace",
+    "schedule": "daily",
+    "time": "02:00",
+    "log_level": "INFO",
+    "description": "Docker configuration - uses service names from docker-compose.yml"
+  }
+}

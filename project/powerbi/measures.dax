@@ -1,0 +1,165 @@
+// =====================================================
+// POWER BI DAX MEASURES FOR LMS DASHBOARD
+// =====================================================
+
+// Core KPIs
+Total Students = COUNTROWS(dim_student)
+
+Active Students = 
+CALCULATE(
+    COUNTROWS(dim_student),
+    dim_student[is_current] = TRUE()
+)
+
+Total Courses = COUNTROWS(dim_course)
+
+Total Teachers = COUNTROWS(dim_teacher)
+
+// Academic Performance
+Average GPA = 
+AVERAGEX(
+    fact_score,
+    fact_score[gpa]
+)
+
+Current Semester GPA = 
+VAR CurrentSemester = 
+    SELECTEDVALUE(dim_semester[semester_sk])
+RETURN
+    CALCULATE(
+        AVERAGE(fact_score[gpa]),
+        dim_semester[semester_sk] = CurrentSemester
+    )
+
+Passing Rate = 
+DIVIDE(
+    CALCULATE(
+        COUNTROWS(fact_enrollment),
+        fact_enrollment[grade_point] >= 2.0
+    ),
+    COUNTROWS(fact_enrollment)
+) * 100
+
+Honors Rate = 
+DIVIDE(
+    CALCULATE(
+        COUNTROWS(fact_score),
+        fact_score[gpa] >= 3.5
+    ),
+    COUNTROWS(fact_score)
+) * 100
+
+At_Risk_Rate = 
+DIVIDE(
+    CALCULATE(
+        COUNTROWS(fact_score),
+        fact_score[gpa] < 2.0
+    ),
+    COUNTROWS(fact_score)
+) * 100
+
+// Attendance Metrics
+Attendance Rate = 
+DIVIDE(
+    CALCULATE(
+        COUNTROWS(fact_attendance),
+        fact_attendance[is_absent] = FALSE()
+    ),
+    COUNTROWS(fact_attendance)
+) * 100
+
+Late Arrival Rate = 
+DIVIDE(
+    CALCULATE(
+        COUNTROWS(fact_attendance),
+        fact_attendance[is_late] = TRUE()
+    ),
+    COUNTROWS(fact_attendance)
+) * 100
+
+Average Class Duration (Minutes) = 
+AVERAGEX(
+    fact_attendance,
+    fact_attendance[duration_minutes]
+)
+
+// Trend Analysis
+YoY Enrollment Growth = 
+VAR CurrentYear = SELECTEDVALUE(dim_date[year])
+VAR PreviousYear = CurrentYear - 1
+VAR CurrentEnrollment = 
+    CALCULATE(
+        COUNTROWS(fact_enrollment),
+        dim_date[year] = CurrentYear
+    )
+VAR PreviousEnrollment = 
+    CALCULATE(
+        COUNTROWS(fact_enrollment),
+        dim_date[year] = PreviousYear
+    )
+RETURN
+    DIVIDE(
+        CurrentEnrollment - PreviousEnrollment,
+        PreviousEnrollment
+    ) * 100
+
+MoM Attendance Change = 
+VAR CurrentMonth = SELECTEDVALUE(dim_date[month])
+VAR PreviousMonth = CurrentMonth - 1
+VAR CurrentAttendance = 
+    CALCULATE(
+        [Attendance Rate],
+        dim_date[month] = CurrentMonth
+    )
+VAR PreviousAttendance = 
+    CALCULATE(
+        [Attendance Rate],
+        dim_date[month] = PreviousMonth
+    )
+RETURN
+    CurrentAttendance - PreviousAttendance
+
+// Performance by Category
+GPA by Department = 
+SUMMARIZE(
+    dim_student,
+    dim_student[department_name],
+    "Average GPA", CALCULATE(AVERAGE(fact_score[gpa])),
+    "Student Count", CALCULATE(COUNTROWS(fact_score))
+)
+
+Course Performance Ranking = 
+TOPN(
+    10,
+    ADDCOLUMNS(
+        SUMMARIZE(
+            fact_enrollment,
+            dim_course[course_name],
+            dim_course[department_name]
+        ),
+        "Avg Grade", CALCULATE(AVERAGE(fact_enrollment[grade_point])),
+        "Pass Rate", CALCULATE(DIVIDE(
+            COUNTROWS(FILTER(fact_enrollment, fact_enrollment[grade_point] >= 2.0)),
+            COUNTROWS(fact_enrollment)
+        )) * 100
+    ),
+    [Avg Grade], DESC
+)
+
+// Predictive Metrics
+Projected Graduation Rate = 
+VAR CurrentStudents = [Total Students]
+VAR GraduatingStudents = 
+    CALCULATE(
+        COUNTROWS(dim_student),
+        dim_student[year_level] >= 4,
+        fact_score[gpa] >= 2.0
+    )
+RETURN
+    DIVIDE(GraduatingStudents, CurrentStudents) * 100
+
+Student Satisfaction Score = 
+AVERAGEX(
+    fact_evaluation,
+    COALESCE(fact_evaluation[rating], 0)
+) * 20  -- Convert to percentage
